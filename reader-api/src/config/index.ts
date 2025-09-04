@@ -11,21 +11,15 @@ export const config = {
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000'
   },
 
-  // MySQL数据库配置
-  mysql: {
-    host: process.env.MYSQL_HOST || 'localhost',
-    port: parseInt(process.env.MYSQL_PORT || '3306', 10),
-    user: process.env.MYSQL_USER || 'root',
-    password: process.env.MYSQL_PASSWORD || 'password',
-    database: process.env.MYSQL_DATABASE || 'react_api_db',
-    connectionLimit: 10,
-    acquireTimeout: 60000,
-    timeout: 60000
-  },
-
-  // MongoDB配置
-  mongodb: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/react_api_db'
+  // PostgreSQL配置
+  postgresql: {
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+    user: process.env.POSTGRES_USER || 'postgres',
+    password: process.env.POSTGRES_PASSWORD || 'password',
+    database: process.env.POSTGRES_DATABASE || 'reader_db',
+    max: parseInt(process.env.POSTGRES_MAX_CONNECTIONS || '10', 10),
+    ssl: process.env.POSTGRES_SSL === 'true'
   },
 
   // JWT配置

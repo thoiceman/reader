@@ -3,8 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config';
-import { testMySQLConnection } from './config/mysql';
-import { connectMongoDB } from './config/mongodb';
+import { connectPostgreSQL } from './config/postgresql';
 import apiRoutes from './routes';
 
 // 创建Express应用实例
@@ -67,24 +66,12 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
 
 // 初始化数据库连接
 export const initializeDatabases = async (): Promise<void> => {
-  console.log('🔄 正在初始化数据库连接...');
+  console.log('🔄 正在初始化PostgreSQL数据库连接...');
   
-  // 测试MySQL连接
-  const mysqlConnected = await testMySQLConnection();
-  if (!mysqlConnected) {
-    console.warn('⚠️  MySQL连接失败，但服务器将继续运行');
-  }
-  
-  // 连接MongoDB
-  const mongoConnected = await connectMongoDB();
-  if (!mongoConnected) {
-    console.warn('⚠️  MongoDB连接失败，但服务器将继续运行');
-  }
-  
-  if (mysqlConnected || mongoConnected) {
-    console.log('✅ 至少一个数据库连接成功');
-  } else {
-    console.warn('⚠️  所有数据库连接都失败了');
+  // 连接PostgreSQL
+  const postgresConnected = await connectPostgreSQL();
+  if (!postgresConnected) {
+    throw new Error('PostgreSQL数据库连接失败');
   }
 };
 

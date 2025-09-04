@@ -1,13 +1,13 @@
 # Reader API
 
-一个基于Node.js和Express的RESTful API项目，支持MySQL和MongoDB双数据库。
+一个基于Node.js和Express的RESTful API项目，支持MySQL和PostgreSQL双数据库。
 
 ## 功能特性
 
 - ✅ Express.js框架
 - ✅ TypeScript支持
 - ✅ MySQL数据库连接（使用连接池）
-- ✅ MongoDB数据库连接（使用Mongoose）
+- ✅ PostgreSQL数据库连接（使用pg连接池）
 - ✅ JWT身份验证
 - ✅ 密码加密（bcrypt）
 - ✅ CORS支持
@@ -25,18 +25,30 @@ reader-api/
 │   ├── config/          # 配置文件
 │   │   ├── index.ts     # 主配置
 │   │   ├── mysql.ts     # MySQL配置
-│   │   └── mongodb.ts   # MongoDB配置
+│   │   └── postgresql.ts # PostgreSQL配置
 │   ├── controllers/     # 控制器
-│   │   └── userController.ts
+│   │   ├── userController.ts
+│   │   ├── articleController.ts
+│   │   ├── categoryController.ts
+│   │   └── tagController.ts
 │   ├── models/          # 数据模型
-│   │   └── User.ts
+│   │   ├── User.ts
+│   │   ├── Article.ts
+│   │   ├── Category.ts
+│   │   └── Tag.ts
 │   ├── routes/          # 路由
 │   │   ├── index.ts
-│   │   └── userRoutes.ts
+│   │   ├── userRoutes.ts
+│   │   ├── articleRoutes.ts
+│   │   ├── categoryRoutes.ts
+│   │   └── tagRoutes.ts
 │   ├── middleware/      # 中间件
 │   ├── utils/           # 工具函数
 │   ├── app.ts           # Express应用配置
 │   └── index.ts         # 应用入口
+├── src/database/        # 数据库相关
+│   ├── init.sql         # 数据库初始化脚本
+│   └── migrate.ts       # 数据库迁移脚本
 ├── tests/               # 测试文件
 ├── .env                 # 环境变量
 ├── .env.example         # 环境变量示例
@@ -83,7 +95,40 @@ npm start
 - `GET /api/users/:id` - 根据ID获取用户
 - `POST /api/users` - 创建新用户
 - `POST /api/users/login` - 用户登录
-- `GET /api/users/stats` - 获取用户统计（MySQL示例）
+- `PUT /api/users/:id` - 更新用户信息
+- `DELETE /api/users/:id` - 删除用户
+
+### 文章管理
+- `GET /api/articles` - 获取所有文章
+- `GET /api/articles/:id` - 根据ID获取文章
+- `GET /api/articles/slug/:slug` - 根据slug获取文章
+- `POST /api/articles` - 创建新文章
+- `PUT /api/articles/:id` - 更新文章
+- `DELETE /api/articles/:id` - 删除文章
+- `PUT /api/articles/:id/publish` - 发布文章
+- `PUT /api/articles/:id/archive` - 归档文章
+
+### 分类管理
+- `GET /api/categories` - 获取所有分类
+- `GET /api/categories/:id` - 根据ID获取分类
+- `GET /api/categories/slug/:slug` - 根据slug获取分类
+- `GET /api/categories/tree` - 获取分类树
+- `POST /api/categories` - 创建新分类
+- `PUT /api/categories/:id` - 更新分类
+- `DELETE /api/categories/:id` - 删除分类
+- `PUT /api/categories/sort` - 更新分类排序
+
+### 标签管理
+- `GET /api/tags` - 获取所有标签
+- `GET /api/tags/:id` - 根据ID获取标签
+- `GET /api/tags/slug/:slug` - 根据slug获取标签
+- `GET /api/tags/name/:name` - 根据名称获取标签
+- `POST /api/tags` - 创建新标签
+- `PUT /api/tags/:id` - 更新标签
+- `DELETE /api/tags/:id` - 删除标签
+- `GET /api/tags/unused` - 获取未使用的标签
+- `DELETE /api/tags/cleanup` - 清理未使用的标签
+- `POST /api/tags/merge` - 合并标签
 
 ### 示例请求
 
@@ -118,9 +163,17 @@ curl -X POST http://localhost:3000/api/users/login \
 - 端口: 3306
 - 数据库: react_api_db
 
-### MongoDB
-项目使用Mongoose连接MongoDB，需要确保MongoDB服务正在运行。默认配置：
-- URI: mongodb://localhost:27017/react_api_db
+### PostgreSQL
+项目使用pg连接池连接PostgreSQL，需要确保PostgreSQL服务正在运行。默认配置：
+- 主机: localhost
+- 端口: 5432
+- 数据库: reader_api_db
+
+#### 数据库初始化
+```bash
+# 运行数据库迁移脚本
+npm run migrate
+```
 
 ## 环境变量说明
 
@@ -133,7 +186,14 @@ curl -X POST http://localhost:3000/api/users/login \
 | MYSQL_USER | MySQL用户名 | root |
 | MYSQL_PASSWORD | MySQL密码 | password |
 | MYSQL_DATABASE | MySQL数据库名 | react_api_db |
-| MONGODB_URI | MongoDB连接URI | mongodb://localhost:27017/react_api_db |
+| POSTGRES_HOST | PostgreSQL主机 | localhost |
+| POSTGRES_PORT | PostgreSQL端口 | 5432 |
+| POSTGRES_USER | PostgreSQL用户名 | postgres |
+| POSTGRES_PASSWORD | PostgreSQL密码 | password |
+| POSTGRES_DATABASE | PostgreSQL数据库名 | reader_api_db |
+| POSTGRES_MAX_CONNECTIONS | PostgreSQL最大连接数 | 20 |
+| POSTGRES_IDLE_TIMEOUT | PostgreSQL空闲超时(ms) | 30000 |
+| POSTGRES_CONNECTION_TIMEOUT | PostgreSQL连接超时(ms) | 2000 |
 | JWT_SECRET | JWT密钥 | 必须设置 |
 | JWT_EXPIRES_IN | JWT过期时间 | 7d |
 | CORS_ORIGIN | CORS允许的源 | http://localhost:3000 |
@@ -146,9 +206,21 @@ curl -X POST http://localhost:3000/api/users/login \
 - 包含完整的错误处理和日志记录
 - 支持优雅关闭，确保数据库连接正确关闭
 
+## 数据库架构
+
+项目使用PostgreSQL作为主数据库，包含以下主要表：
+- `users` - 用户表
+- `articles` - 文章表
+- `categories` - 分类表
+- `tags` - 标签表
+- `article_tags` - 文章标签关联表
+
+详细的数据库结构请参考 `src/database/init.sql` 文件。
+
 ## 注意事项
 
-1. 确保MySQL和MongoDB服务正在运行
+1. 确保MySQL和PostgreSQL服务正在运行
 2. 修改 `.env` 文件中的数据库连接信息
-3. 生产环境请使用强密码和安全的JWT密钥
-4. 建议使用反向代理（如Nginx）部署生产环境
+3. 首次运行前请执行 `npm run migrate` 初始化数据库
+4. 生产环境请使用强密码和安全的JWT密钥
+5. 建议使用反向代理（如Nginx）部署生产环境

@@ -1,10 +1,16 @@
 import { Router } from 'express';
 import userRoutes from './userRoutes';
+import articleRoutes from './articleRoutes';
+import categoryRoutes from './categoryRoutes';
+import tagRoutes from './tagRoutes';
 
 const router = Router();
 
 // API路由
 router.use('/users', userRoutes);
+router.use('/articles', articleRoutes);
+router.use('/categories', categoryRoutes);
+router.use('/tags', tagRoutes);
 
 // API信息路由
 router.get('/', (req, res) => {
@@ -13,8 +19,9 @@ router.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       users: '/api/users',
-      userStats: '/api/users/stats',
-      userLogin: '/api/users/login',
+      articles: '/api/articles',
+      categories: '/api/categories',
+      tags: '/api/tags',
       health: '/health'
     },
     documentation: {

@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User, IUser } from '../models/User';
-import { executeQuery } from '../config/mysql';
 import { config } from '../config';
 
 // 响应接口
@@ -25,141 +23,313 @@ const generateToken = (userId: string): string => {
   } as jwt.SignOptions);
 };
 
-// 获取所有用户 (暂时使用模拟数据)
-export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
+// 获取所有用户
+export const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    // 暂时返回模拟数据，因为MongoDB未连接
-    const mockUsers = [
-      { _id: '1', username: 'testuser1', email: 'test1@example.com', createdAt: new Date() },
-      { _id: '2', username: 'testuser2', email: 'test2@example.com', createdAt: new Date() }
-    ];
-    
-    res.status(200).json(createResponse(true, '获取用户列表成功 (模拟数据)', mockUsers));
-  } catch (error) {
-    console.error('获取用户列表失败:', error);
-    res.status(500).json(createResponse(false, '获取用户列表失败', null, (error as Error).message));
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
+    const users = await User.findAll({
+      limit,
+      offset,
+      orderBy: 'created_at',
+      orderDirection: 'DESC',
+      isActive: true
+    });
+
+    // 移除密码字段
+    const safeUsers = users.map(user => {
+      const { password, ...safeUser } = user;
+      return safeUser;
+    });
+
+    const total = await User.count(true);
+
+    res.json({
+      success: true,
+      data: {
+        users: safeUsers,
+        pagination: {
+          current: page,
+          pages: Math.ceil(total / limit),
+          total
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('获取用户列表错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误',
+      error: error.message
+    });
   }
 };
 
-// 根据ID获取用户 (MongoDB)
+// 根据ID获取用户
 export const getUserById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id).select('-password');
-    
-    if (!user) {
-      res.status(404).json(createResponse(false, '用户不存在'));
+    const userId = parseInt(id);
+
+    if (isNaN(userId)) {
+      res.status(400).json({
+        success: false,
+        message: '无效的用户ID'
+      });
       return;
     }
-    
-    res.status(200).json(createResponse(true, '获取用户信息成功', user));
-  } catch (error) {
-    console.error('获取用户信息失败:', error);
-    res.status(500).json(createResponse(false, '获取用户信息失败', null, (error as Error).message));
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+      return;
+    }
+
+    // 移除密码字段
+    const { password, ...safeUser } = user;
+
+    res.json({
+      success: true,
+      data: { user: safeUser }
+    });
+  } catch (error: any) {
+    console.error('获取用户错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误',
+      error: error.message
+    });
   }
 };
 
-// 创建用户 (MongoDB)
+// 创建用户
 export const createUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { username, email, password, firstName, lastName } = req.body;
-    
-    // 验证必需字段
-    if (!username || !email || !password) {
-      res.status(400).json(createResponse(false, '用户名、邮箱和密码是必需的'));
+    const { username, email, password, avatar, bio } = req.body;
+
+    // 检查用户名是否已存在
+    const usernameExists = await User.isUsernameExists(username);
+    if (usernameExists) {
+      res.status(400).json({
+        success: false,
+        message: '用户名已存在'
+      });
       return;
     }
-    
-    // 检查用户是否已存在
-    const existingUser = await User.findOne({
-      $or: [{ email }, { username }]
-    });
-    
-    if (existingUser) {
-      res.status(409).json(createResponse(false, '用户名或邮箱已存在'));
+
+    // 检查邮箱是否已存在
+    const emailExists = await User.isEmailExists(email);
+    if (emailExists) {
+      res.status(400).json({
+        success: false,
+        message: '邮箱已存在'
+      });
       return;
     }
-    
-    // 加密密码
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-    
+
     // 创建新用户
-    const newUser = new User({
+    const newUser = await User.create({
       username,
       email,
-      password: hashedPassword,
-      firstName,
-      lastName
+      password,
+      avatar,
+      bio
     });
-    
-    const savedUser = await newUser.save();
-    
-    // 生成JWT Token
-    const token = generateToken(savedUser._id);
-    
-    res.status(201).json(createResponse(true, '用户创建成功', {
-      user: savedUser.toJSON(),
-      token
-    }));
-  } catch (error) {
-    console.error('创建用户失败:', error);
-    res.status(500).json(createResponse(false, '创建用户失败', null, (error as Error).message));
+
+    // 生成JWT token
+    const token = generateToken(newUser.id!.toString());
+
+    res.status(201).json({
+      success: true,
+      message: '用户创建成功',
+      data: {
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          avatar: newUser.avatar,
+          bio: newUser.bio,
+          isActive: newUser.isActive,
+          createdAt: newUser.createdAt
+        },
+        token
+      }
+    });
+  } catch (error: any) {
+    console.error('创建用户错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误',
+      error: error.message
+    });
   }
 };
 
-// 用户登录 (MongoDB)
+// 用户登录
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
-    
-    // 验证必需字段
-    if (!email || !password) {
-      res.status(400).json(createResponse(false, '邮箱和密码是必需的'));
-      return;
-    }
-    
+
     // 查找用户
-    const user = await User.findOne({ email, isActive: true });
+    const user = await User.findByEmail(email);
+
     if (!user) {
-      res.status(401).json(createResponse(false, '邮箱或密码错误'));
+      res.status(401).json({
+        success: false,
+        message: '邮箱或密码错误'
+      });
       return;
     }
-    
+
     // 验证密码
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await User.comparePassword(password, user.password);
+
     if (!isPasswordValid) {
-      res.status(401).json(createResponse(false, '邮箱或密码错误'));
+      res.status(401).json({
+        success: false,
+        message: '邮箱或密码错误'
+      });
       return;
     }
-    
-    // 生成JWT Token
-    const token = generateToken(user._id);
-    
-    res.status(200).json(createResponse(true, '登录成功', {
-      user: user.toJSON(),
-      token
-    }));
-  } catch (error) {
-    console.error('用户登录失败:', error);
-    res.status(500).json(createResponse(false, '登录失败', null, (error as Error).message));
+
+    // 更新最后登录时间
+    await User.updateLastLogin(user.id!);
+
+    // 生成JWT token
+    const token = generateToken(user.id!.toString());
+
+    res.json({
+      success: true,
+      message: '登录成功',
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          avatar: user.avatar,
+          bio: user.bio,
+          isActive: user.isActive,
+          createdAt: user.createdAt
+        },
+        token
+      }
+    });
+  } catch (error: any) {
+    console.error('用户登录错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误',
+      error: error.message
+    });
   }
 };
 
-// 获取用户统计信息 (暂时使用模拟数据)
-export const getUserStats = async (req: Request, res: Response): Promise<void> => {
+// 更新用户信息
+export const updateUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    // 暂时返回模拟统计数据，因为MySQL未连接
-    const mockStats = {
-      total_users: 150,
-      recent_users: 25,
-      active_users: 120,
-      last_updated: new Date().toISOString()
-    };
-    
-    res.status(200).json(createResponse(true, '获取用户统计成功 (模拟数据)', mockStats));
-  } catch (error) {
-    console.error('获取用户统计失败:', error);
-    res.status(500).json(createResponse(false, '获取用户统计失败', null, (error as Error).message));
+    const { id } = req.params;
+    const userId = parseInt(id);
+    const updateData = req.body;
+
+    if (isNaN(userId)) {
+      res.status(400).json({
+        success: false,
+        message: '无效的用户ID'
+      });
+      return;
+    }
+
+    // 检查用户名和邮箱唯一性（如果要更新的话）
+    if (updateData.username) {
+      const usernameExists = await User.isUsernameExists(updateData.username, userId);
+      if (usernameExists) {
+        res.status(400).json({
+          success: false,
+          message: '用户名已存在'
+        });
+        return;
+      }
+    }
+
+    if (updateData.email) {
+      const emailExists = await User.isEmailExists(updateData.email, userId);
+      if (emailExists) {
+        res.status(400).json({
+          success: false,
+          message: '邮箱已存在'
+        });
+        return;
+      }
+    }
+
+    const updatedUser = await User.updateById(userId, updateData);
+
+    if (!updatedUser) {
+      res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+      return;
+    }
+
+    // 移除密码字段
+    const { password, ...safeUser } = updatedUser;
+
+    res.json({
+      success: true,
+      message: '用户信息更新成功',
+      data: { user: safeUser }
+    });
+  } catch (error: any) {
+    console.error('更新用户错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误',
+      error: error.message
+    });
+  }
+};
+
+// 删除用户（软删除）
+export const deleteUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = parseInt(id);
+
+    if (isNaN(userId)) {
+      res.status(400).json({
+        success: false,
+        message: '无效的用户ID'
+      });
+      return;
+    }
+
+    const deleted = await User.deleteById(userId);
+
+    if (!deleted) {
+      res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: '用户删除成功'
+    });
+  } catch (error: any) {
+    console.error('删除用户错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误',
+      error: error.message
+    });
   }
 };
