@@ -8,7 +8,7 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || '3000', 10),
     nodeEnv: process.env.NODE_ENV || 'development',
-    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000'
+    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3001'
   },
 
   // PostgreSQL配置
@@ -25,7 +25,7 @@ export const config = {
   // JWT配置
   jwt: {
     secret: process.env.JWT_SECRET || 'your_jwt_secret_key_here',
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+    expiresIn: process.env.JWT_EXPIRES_IN || '2h' // 缩短过期时间以提高安全性（不使用黑名单时）
   },
 
   // 日志配置

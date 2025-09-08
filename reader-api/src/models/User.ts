@@ -1,38 +1,35 @@
 import bcrypt from 'bcryptjs';
 import { executeQuery } from '../config/postgresql';
 
-// 用户接口
+// 用户接口 - 匹配SQL表结构
 export interface IUser {
   id?: number;
   username: string;
-  email: string;
-  password: string;
-  avatar?: string;
-  bio?: string;
-  isActive: boolean;
-  lastLoginAt?: Date;
-  createdAt?: Date;
-  updatedAt?: Date;
+  password_hash: string;
+  is_default_password: boolean;
+  name: string;
+  email?: string;
+  book_preferences: string;
+  created_at?: Date;
 }
 
 // 用户创建接口
 export interface ICreateUser {
   username: string;
-  email: string;
   password: string;
-  avatar?: string;
-  bio?: string;
+  name: string;
+  email?: string;
+  book_preferences?: string;
 }
 
 // 用户更新接口
 export interface IUpdateUser {
   username?: string;
-  email?: string;
   password?: string;
-  avatar?: string;
-  bio?: string;
-  isActive?: boolean;
-  lastLoginAt?: Date;
+  name?: string;
+  email?: string;
+  book_preferences?: string;
+  is_default_password?: boolean;
 }
 
 // 用户查询选项
@@ -53,17 +50,17 @@ export class User {
     const hashedPassword = await bcrypt.hash(userData.password, salt);
 
     const query = `
-      INSERT INTO users (username, email, password, avatar, bio)
+      INSERT INTO users (username, password_hash, name, email, book_preferences)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `;
     
     const values = [
       userData.username,
-      userData.email,
       hashedPassword,
-      userData.avatar || null,
-      userData.bio || null
+      userData.name,
+      userData.email || null,
+      userData.book_preferences || '{}'
     ];
 
     const result = await executeQuery(query, values);
@@ -72,21 +69,21 @@ export class User {
 
   // 根据ID查找用户
   static async findById(id: number): Promise<IUser | null> {
-    const query = 'SELECT * FROM users WHERE id = $1 AND is_active = true';
+    const query = 'SELECT * FROM users WHERE id = $1';
     const result = await executeQuery(query, [id]);
     return result.length > 0 ? (result[0] as IUser) : null;
   }
 
   // 根据用户名查找用户
   static async findByUsername(username: string): Promise<IUser | null> {
-    const query = 'SELECT * FROM users WHERE username = $1 AND is_active = true';
+    const query = 'SELECT * FROM users WHERE username = $1';
     const result = await executeQuery(query, [username]);
     return result.length > 0 ? (result[0] as IUser) : null;
   }
 
   // 根据邮箱查找用户
   static async findByEmail(email: string): Promise<IUser | null> {
-    const query = 'SELECT * FROM users WHERE email = $1 AND is_active = true';
+    const query = 'SELECT * FROM users WHERE email = $1';
     const result = await executeQuery(query, [email]);
     return result.length > 0 ? (result[0] as IUser) : null;
   }
@@ -94,78 +91,87 @@ export class User {
   // 查找所有用户
   static async findAll(options: IUserQueryOptions = {}): Promise<IUser[]> {
     const {
-      limit = 50,
+      limit = 10,
       offset = 0,
       orderBy = 'created_at',
-      orderDirection = 'DESC',
-      isActive = true
+      orderDirection = 'DESC'
     } = options;
 
-    let query = 'SELECT * FROM users WHERE 1=1';
-    const values: any[] = [];
-    let paramCount = 0;
-
-    if (isActive !== undefined) {
-      paramCount++;
-      query += ` AND is_active = $${paramCount}`;
-      values.push(isActive);
-    }
-
-    query += ` ORDER BY ${orderBy} ${orderDirection}`;
+    const query = `
+      SELECT * FROM users 
+      ORDER BY ${orderBy} ${orderDirection}
+      LIMIT $1 OFFSET $2
+    `;
     
-    paramCount++;
-    query += ` LIMIT $${paramCount}`;
-    values.push(limit);
-    
-    paramCount++;
-    query += ` OFFSET $${paramCount}`;
-    values.push(offset);
-
-    const result = await executeQuery(query, values);
+    const result = await executeQuery(query, [limit, offset]);
     return result as IUser[];
   }
 
-  // 更新用户
-  static async updateById(id: number, updateData: IUpdateUser): Promise<IUser | null> {
-    const fields: string[] = [];
+  // 根据ID更新用户
+  static async updateById(id: number, userData: IUpdateUser): Promise<IUser | null> {
+    const updateFields: string[] = [];
     const values: any[] = [];
     let paramCount = 0;
 
     // 动态构建更新字段
-    Object.entries(updateData).forEach(([key, value]) => {
-      if (value !== undefined) {
-        paramCount++;
-        // 将驼峰命名转换为下划线命名
-        const dbField = key === 'isActive' ? 'is_active' : 
-                       key === 'lastLoginAt' ? 'last_login_at' : key;
-        fields.push(`${dbField} = $${paramCount}`);
-        values.push(value);
-      }
-    });
-
-    if (fields.length === 0) {
-      throw new Error('没有提供更新字段');
+    if (userData.username !== undefined) {
+      paramCount++;
+      updateFields.push(`username = $${paramCount}`);
+      values.push(userData.username);
     }
 
-    // 如果更新密码，需要加密
-    if (updateData.password) {
+    if (userData.name !== undefined) {
+      paramCount++;
+      updateFields.push(`name = $${paramCount}`);
+      values.push(userData.name);
+    }
+
+    if (userData.email !== undefined) {
+      paramCount++;
+      updateFields.push(`email = $${paramCount}`);
+      values.push(userData.email);
+    }
+
+    if (userData.password !== undefined) {
+      // 密码加密
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(updateData.password, salt);
-      const passwordIndex = values.findIndex((_, index) => 
-        fields[index].includes('password'));
-      if (passwordIndex !== -1) {
-        values[passwordIndex] = hashedPassword;
-      }
+      const hashedPassword = await bcrypt.hash(userData.password, salt);
+      paramCount++;
+      updateFields.push(`password_hash = $${paramCount}`);
+      values.push(hashedPassword);
+      
+      // 更新密码时，设置is_default_password为false
+      paramCount++;
+      updateFields.push(`is_default_password = $${paramCount}`);
+      values.push(false);
     }
 
+    if (userData.book_preferences !== undefined) {
+      paramCount++;
+      updateFields.push(`book_preferences = $${paramCount}`);
+      values.push(userData.book_preferences);
+    }
+
+    if (userData.is_default_password !== undefined) {
+      paramCount++;
+      updateFields.push(`is_default_password = $${paramCount}`);
+      values.push(userData.is_default_password);
+    }
+
+    if (updateFields.length === 0) {
+      throw new Error('No fields to update');
+    }
+
+    // 添加ID参数
     paramCount++;
+    values.push(id);
+
     const query = `
       UPDATE users 
-      SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $${paramCount} AND is_active = true
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramCount}
       RETURNING *
     `;
-    values.push(id);
 
     const result = await executeQuery(query, values);
     return result.length > 0 ? (result[0] as IUser) : null;
@@ -186,24 +192,21 @@ export class User {
 
   // 验证密码
   static async comparePassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
-    return bcrypt.compare(plainPassword, hashedPassword);
+    return await bcrypt.compare(plainPassword, hashedPassword);
   }
 
   // 统计用户数量
-  static async count(isActive: boolean = true): Promise<number> {
-    const query = 'SELECT COUNT(*) as count FROM users WHERE is_active = $1';
-    const result = await executeQuery(query, [isActive]);
+  static async count(): Promise<number> {
+    const query = 'SELECT COUNT(*) as count FROM users';
+    const result = await executeQuery(query, []);
     return parseInt(result[0].count);
   }
 
-  // 更新最后登录时间
-  static async updateLastLogin(id: number): Promise<void> {
-    const query = `
-      UPDATE users 
-      SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1
-    `;
-    await executeQuery(query, [id]);
+  // 删除用户
+  static async delete(id: number): Promise<boolean> {
+    const query = 'DELETE FROM users WHERE id = $1';
+    const result = await executeQuery(query, [id]);
+    return result.length > 0;
   }
 
   // 检查用户名是否存在
@@ -232,5 +235,20 @@ export class User {
     
     const result = await executeQuery(query, values);
     return parseInt(result[0].count) > 0;
+  }
+
+  // 验证用户密码（用于登录）
+  static async validateUser(username: string, password: string): Promise<IUser | null> {
+    const user = await this.findByUsername(username);
+    if (!user) {
+      return null;
+    }
+
+    const isValidPassword = await this.comparePassword(password, user.password_hash);
+    if (!isValidPassword) {
+      return null;
+    }
+
+    return user;
   }
 }
