@@ -2,10 +2,12 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ConfigProvider, theme, App as AntdApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import { Provider as ReduxProvider } from 'react-redux';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useThemeManager } from './hooks/useThemeManager';
 import { getAntdThemeConfig } from './config/theme';
+import { store } from './store';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
@@ -95,9 +97,11 @@ const AppWithTheme: React.FC = () => {
 // 根应用组件
 function App() {
   return (
-    <AuthProvider>
-      <AppWithTheme />
-    </AuthProvider>
+    <ReduxProvider store={store}>
+      <AuthProvider>
+        <AppWithTheme />
+      </AuthProvider>
+    </ReduxProvider>
   );
 }
 

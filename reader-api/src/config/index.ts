@@ -8,7 +8,7 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || '3000', 10),
     nodeEnv: process.env.NODE_ENV || 'development',
-    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3002'
+    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3001'
   },
 
   // PostgreSQL配置
