@@ -46,9 +46,6 @@ reader-api/
 │   ├── utils/           # 工具函数
 │   ├── app.ts           # Express应用配置
 │   └── index.ts         # 应用入口
-├── src/database/        # 数据库相关
-│   ├── init.sql         # 数据库初始化脚本
-│   └── migrate.ts       # 数据库迁移脚本
 ├── tests/               # 测试文件
 ├── .env                 # 环境变量
 ├── .env.example         # 环境变量示例
@@ -168,11 +165,6 @@ curl -X POST http://localhost:3000/api/users/login \
 - 主机: localhost
 - 端口: 5432
 - 数据库: reader_api_db
-
-#### 数据库初始化
-```bash
-# 运行数据库迁移脚本
-npm run migrate
 ```
 
 ## 环境变量说明
@@ -215,12 +207,10 @@ npm run migrate
 - `tags` - 标签表
 - `article_tags` - 文章标签关联表
 
-详细的数据库结构请参考 `src/database/init.sql` 文件。
 
 ## 注意事项
 
 1. 确保MySQL和PostgreSQL服务正在运行
 2. 修改 `.env` 文件中的数据库连接信息
-3. 首次运行前请执行 `npm run migrate` 初始化数据库
 4. 生产环境请使用强密码和安全的JWT密钥
 5. 建议使用反向代理（如Nginx）部署生产环境

@@ -14,7 +14,7 @@ const createPool = (): Pool => {
     database: config.postgresql.database,
     max: config.postgresql.max, // 连接池最大连接数
     idleTimeoutMillis: 30000, // 空闲连接超时时间
-    connectionTimeoutMillis: 2000, // 连接超时时间
+    connectionTimeoutMillis: 10000, // 连接超时时间增加到10秒
     ssl: config.postgresql.ssl ? { rejectUnauthorized: false } : false
   });
 };
@@ -42,16 +42,34 @@ export const connectPostgreSQL = async (): Promise<boolean> => {
   }
 };
 
-// 执行PostgreSQL查询
-export const executeQuery = async <T = any>(text: string, params?: any[]): Promise<T[]> => {
+// 执行PostgreSQL查询（带重试机制）
+export const executeQuery = async <T = any>(text: string, params?: any[], retries = 3): Promise<T[]> => {
   const pgPool = getPool();
-  const client = await pgPool.connect();
-  try {
-    const result = await client.query(text, params);
-    return result.rows;
-  } finally {
-    client.release();
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    let client;
+    try {
+      client = await pgPool.connect();
+      const result = await client.query(text, params);
+      return result.rows;
+    } catch (error: any) {
+      if (client) {
+        client.release();
+      }
+      
+      // 如果是最后一次尝试，抛出错误
+      if (attempt === retries) {
+        console.error(`数据库查询失败，已重试 ${retries} 次:`, error.message);
+        throw error;
+      }
+      
+      // 等待一段时间后重试
+      console.warn(`数据库查询失败，第 ${attempt} 次重试中...`);
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
   }
+  
+  throw new Error('数据库查询重试次数已用完');
 };
 
 // 执行事务
