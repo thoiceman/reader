@@ -1,3 +1,0 @@
-ALTER TABLE library
-    ADD COLUMN scan_mode VARCHAR(20) NOT NULL DEFAULT 'FILE_AS_BOOK',
-    ADD COLUMN default_book_format VARCHAR(10) NULL;
