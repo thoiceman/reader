@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: reader-api
+  thymeleaf:
+    check-template-location: false
