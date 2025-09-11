@@ -49,11 +49,6 @@
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
 		</dependency>
-        <!-- 引入Spring封装的jdbc，内部默认依赖了 HikariDataSource  数据源-->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jdbc</artifactId>
-		</dependency>
 		<!-- JPA支持 -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
