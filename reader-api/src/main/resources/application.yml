@@ -1,5 +1,45 @@
 spring:
   application:
     name: reader-api
+  # 禁用模板位置检查
   thymeleaf:
     check-template-location: false
+  
+  # 数据库配置
+  datasource:
+    url: jdbc:mysql://114.55.40.228:3306/reader?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: reader
+    password: reader
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    
+    # HikariCP 连接池配置
+    hikari:
+      pool-name: HikariCP
+      minimum-idle: 1
+      maximum-pool-size: 5
+      connection-timeout: 60000  # 增加连接超时时间到60秒
+      idle-timeout: 300000       # 减少空闲超时时间
+      max-lifetime: 900000       # 减少最大生命周期
+      leak-detection-threshold: 60000
+      validation-timeout: 10000  # 增加验证超时
+      initialization-fail-timeout: -1  # 禁用初始化失败超时
+      connection-test-query: SELECT 1  # 添加连接测试查询
+  
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: none    # 暂时禁用自动DDL
+    show-sql: true      # 显示SQL语句
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true  # 格式化SQL输出
+        jdbc:
+          time_zone: UTC  # 设置时区
+    defer-datasource-initialization: true  # 延迟数据源初始化
+  
+  # SQL初始化配置
+  sql:
+    init:
+      mode: never  # 禁用SQL初始化脚本
+  
