@@ -1,11 +1,12 @@
 
-import {Button} from 'antd'
+import { App as AntdApp } from 'antd'
+import Router from './router';
+
 function App() {
   return (
-    <div>
-      App
-      <Button danger>按钮</Button>
-    </div>
+    <AntdApp>
+      <Router />
+    </AntdApp>
   );
 }
 
